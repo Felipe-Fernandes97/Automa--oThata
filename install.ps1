@@ -25,11 +25,15 @@ $apps = @()
 
 foreach ($property in $config.PSObject.Properties) {
     $value = $property.Value
+    $installerProperty = $value.PSObject.Properties['installer']
+    $installer = if ($installerProperty) { $installerProperty.Value } else { $null }
     $apps += [pscustomobject]@{
         Key = $property.Name
         Name = if ($value.PSObject.Properties.Name -contains 'name') { [string]$value.name } else { [string]$property.Name }
-        Id = [string]$value.id
+        Id = if ($value.PSObject.Properties.Name -contains 'id') { [string]$value.id } else { '' }
         Script = if ($value.PSObject.Properties.Name -contains 'script') { [string]$value.script } else { [string]$property.Name }
+        InstallerType = if ($installer -and $installer.PSObject.Properties.Name -contains 'type') { [string]$installer.type } else { '' }
+        InstallerPattern = if ($installer -and $installer.PSObject.Properties.Name -contains 'pattern') { [string]$installer.pattern } else { '' }
     }
 }
 
@@ -77,13 +81,32 @@ $logFile = Join-Path $logsDirectory ("install-{0}.log" -f $timestamp)
 foreach ($app in $selectedApps) {
     Write-Host ''
     Write-Host ("Instalando {0}..." -f $app.Name)
-    $scriptPath = Join-Path $root ("Apps/{0}.ps1" -f $app.Script)
 
-    if (Test-Path $scriptPath) {
-        & $scriptPath -PackageId $app.Id -DisplayName $app.Name -LogPath $logFile
+    if ($app.InstallerType -eq 'msi') {
+        if ([string]::IsNullOrWhiteSpace($app.InstallerPattern)) {
+            throw "Padrão do instalador MSI não configurado para $($app.Name)."
+        }
+
+        $installerFiles = @(Get-ChildItem -LiteralPath $env:TEMP -Filter $app.InstallerPattern -File)
+        if ($installerFiles.Count -eq 0) {
+            throw "Nenhum instalador encontrado em $env:TEMP com o padrão '$($app.InstallerPattern)'. Transfira o MSI pelo Bomgar antes de executar a automação."
+        }
+        if ($installerFiles.Count -gt 1) {
+            throw "Foram encontrados vários instaladores para $($app.Name) em $env:TEMP. Deixe somente o MSI da versão desejada e execute novamente."
+        }
+
+        Invoke-MsiInstall -MsiPath $installerFiles[0].FullName -DisplayName $app.Name -LogPath $logFile
     } else {
-        Write-Warning ("Script nao encontrado para {0}. Usando instalacao padrao via winget." -f $app.Name)
-        Invoke-WingetInstall -PackageId $app.Id -DisplayName $app.Name -LogPath $logFile
+        $scriptPath = Join-Path $root ("Apps/{0}.ps1" -f $app.Script)
+        if (Test-Path $scriptPath) {
+            & $scriptPath -PackageId $app.Id -DisplayName $app.Name -LogPath $logFile
+        } else {
+            if ([string]::IsNullOrWhiteSpace($app.Id)) {
+                throw "ID do pacote winget não configurado para $($app.Name)."
+            }
+            Write-Warning ("Script nao encontrado para {0}. Usando instalacao padrao via winget." -f $app.Name)
+            Invoke-WingetInstall -PackageId $app.Id -DisplayName $app.Name -LogPath $logFile
+        }
     }
 
     Write-Host 'Concluido'

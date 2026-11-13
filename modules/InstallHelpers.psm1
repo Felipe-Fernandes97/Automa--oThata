@@ -29,4 +29,36 @@ function Invoke-WingetInstall {
     }
 }
 
-Export-ModuleMember -Function Invoke-WingetInstall
+function Invoke-MsiInstall {
+    param(
+        [Parameter(Mandatory = $true)] [string]$MsiPath,
+        [Parameter(Mandatory = $true)] [string]$DisplayName,
+        [Parameter()] [string]$LogPath
+    )
+
+    $installEntry = "[{0}] Instalando {1} pelo MSI: {2}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $DisplayName, $MsiPath
+    if ($LogPath) {
+        Add-Content -Path $LogPath -Value $installEntry
+    }
+
+    Write-Host ("Instalando {0} silenciosamente. O instalador MSI permanece na pasta temporaria." -f $DisplayName)
+    $process = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', ('"{0}"' -f $MsiPath), '/qn', '/norestart') -Wait -PassThru
+
+    if ($process.ExitCode -notin @(0, 3010)) {
+        $errorMessage = "A instalacao de $DisplayName falhou. Codigo de saida do Windows Installer: $($process.ExitCode)."
+        if ($LogPath) {
+            Add-Content -Path $LogPath -Value ("[{0}] ERRO: {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $errorMessage)
+        }
+        throw $errorMessage
+    }
+
+    $status = if ($process.ExitCode -eq 3010) { 'SUCESSO; reinicializacao necessaria' } else { 'SUCESSO' }
+    if ($LogPath) {
+        Add-Content -Path $LogPath -Value ("[{0}] {1}: {2}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $status, $DisplayName)
+    }
+    if ($process.ExitCode -eq 3010) {
+        Write-Warning 'Instalacao concluida. O Windows solicitou uma reinicializacao.'
+    }
+}
+
+Export-ModuleMember -Function Invoke-WingetInstall, Invoke-MsiInstall

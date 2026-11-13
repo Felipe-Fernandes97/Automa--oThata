@@ -1,27 +1,9 @@
 {
-  "discord": {
-    "name": "Discord",
-    "id": "Discord.Discord",
-    "script": "discord"
-  },
-  "chrome": {
-    "name": "Google Chrome",
-    "id": "Google.Chrome",
-    "script": "chrome"
-  },
-  "steam": {
-    "name": "Steam",
-    "id": "Valve.Steam",
-    "script": "steam"
-  },
-  "brave": {
-    "name": "Brave Browser",
-    "id": "Brave.Brave",
-    "script": "brave"
-  },
-  "vscode": {
-    "name": "Visual Studio Code",
-    "id": "Microsoft.VisualStudioCode",
-    "script": "vscode"
+  "nutrismart": {
+    "name": "NutriSmart",
+    "installer": {
+      "type": "msi",
+      "pattern": "NutriSmart*.msi"
+    }
   }
 }
